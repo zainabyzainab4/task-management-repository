@@ -2,6 +2,7 @@ const taskRoutes = require("./routes/taskRoutes");
 const productRoutes = require("./routes/productRoutes");
 const express = require("express");
 const dotenv = require("dotenv");
+const orderRoutes = require("./routes/orderRoutes");
 const connectDB = require("./config/db");
 
 
@@ -11,7 +12,7 @@ connectDB();
 
 const app = express();
 app.use(express.json());
-
+app.use("/uploads", express.static("uploads"));
 const PORT = process.env.PORT || 5000;
 
 app.get("/api/health", (req, res) => {
@@ -25,3 +26,5 @@ app.use("/api/products", productRoutes);
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+app.use("/api/orders", orderRoutes);
