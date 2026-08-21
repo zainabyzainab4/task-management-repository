@@ -11,12 +11,13 @@ const {
     hardDeleteOrder
 } = require("../controllers/orderController");
 
-router.post("/", createOrder);
-router.get("/", getOrders);
-router.get("/:id", getOrderById);
-router.put("/:id", updateOrder);
-router.patch("/:id", patchOrder);
-router.delete("/:id/soft", softDeleteOrder);
-router.delete("/:id/hard", hardDeleteOrder);
-
+const authenticate = require("../middleware/authMiddleware");
+const authorizeAdmin = require("../middleware/roleMiddleware");
+router.post("/", authenticate, authorizeAdmin, createOrder);
+router.get("/", authenticate, getOrders);
+router.get("/:id", authenticate, getOrderById);
+router.put("/:id", authenticate, authorizeAdmin, updateOrder);
+router.patch("/:id", authenticate, authorizeAdmin, patchOrder);
+router.delete("/:id/soft", authenticate, authorizeAdmin, softDeleteOrder);
+router.delete("/:id/hard", authenticate, authorizeAdmin, hardDeleteOrder);
 module.exports = router;

@@ -4,7 +4,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const orderRoutes = require("./routes/orderRoutes");
 const connectDB = require("./config/db");
-
+const userRoutes = require("./routes/userRoutes");
 
 dotenv.config();
 
@@ -28,3 +28,4 @@ app.listen(PORT, () => {
 });
 
 app.use("/api/orders", orderRoutes);
+app.use("/api/users", userRoutes);
