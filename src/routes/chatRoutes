@@ -1,0 +1,406 @@
+const express = require("express");
+const router = express.Router();
+
+const Conversation = require("../models/Conversation");
+const Message = require("../models/Message");
+const User = require("../models/User");
+
+const authenticate = require("../middleware/authMiddleware");
+
+// Get logged-in user's ID safely
+const getUserId = (req) => {
+    return (
+        req.user?._id ||
+        req.user?.id ||
+        req.user?.userId
+    );
+};
+
+
+
+router.get("/users", authenticate, async (req, res) => {
+    try {
+        const currentUserId = getUserId(req);
+
+        if (!currentUserId) {
+            console.log("JWT USER:", req.user);
+
+            return res.status(401).json({
+                message: "User ID not found in token"
+            });
+        }
+
+        const users = await User.find({
+            _id: {
+                $ne: currentUserId
+            },
+            isDeleted: {
+                $ne: true
+            }
+        }).select("_id name email role");
+
+        res.json(users);
+
+    } catch (error) {
+        console.error("Get chat users error:", error);
+
+        res.status(500).json({
+            message: "Failed to get chat users"
+        });
+    }
+});
+
+
+
+router.get(
+    "/conversations",
+    authenticate,
+    async (req, res) => {
+        try {
+            const currentUserId = getUserId(req);
+
+            if (!currentUserId) {
+                return res.status(401).json({
+                    message: "User ID not found in token"
+                });
+            }
+
+            const conversations = await Conversation.find({
+                participants: currentUserId
+            })
+                .populate(
+                    "participants",
+                    "_id name email role"
+                )
+                .sort({
+                    updatedAt: -1
+                });
+
+            res.json(conversations);
+
+        } catch (error) {
+            console.error(
+                "Get conversations error:",
+                error
+            );
+
+            res.status(500).json({
+                message: "Failed to get conversations"
+            });
+        }
+    }
+);
+
+
+
+router.post(
+    "/conversations",
+    authenticate,
+    async (req, res) => {
+
+        try {
+
+            console.log("========== CREATE CHAT ==========");
+            console.log("JWT USER:", req.user);
+            console.log("REQUEST BODY:", req.body);
+
+            const currentUserId = getUserId(req);
+
+            console.log(
+                "CURRENT USER ID:",
+                currentUserId
+            );
+
+            if (!currentUserId) {
+                return res.status(401).json({
+                    message:
+                        "User ID not found in authentication token"
+                });
+            }
+
+            const {
+                type,
+                name,
+                participants
+            } = req.body;
+
+        
+            if (
+                !type ||
+                !["direct", "group"].includes(type)
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Conversation type must be direct or group"
+                });
+            }
+
+            if (!Array.isArray(participants)) {
+                return res.status(400).json({
+                    message:
+                        "Participants must be an array"
+                });
+            }
+
+            if (participants.length === 0) {
+                return res.status(400).json({
+                    message:
+                        "Please select at least one user"
+                });
+            }
+
+       
+            const participantIds = participants
+                .map((participant) => {
+
+                    if (typeof participant === "string") {
+                        return participant;
+                    }
+
+                    if (
+                        participant &&
+                        participant._id
+                    ) {
+                        return participant._id;
+                    }
+
+                    if (
+                        participant &&
+                        participant.id
+                    ) {
+                        return participant.id;
+                    }
+
+                    return null;
+                })
+                .filter(
+                    (id) =>
+                        id !== null &&
+                        id !== undefined
+                );
+
+            console.log(
+                "PARTICIPANT IDS:",
+                participantIds
+            );
+
+            if (
+                participantIds.length !==
+                participants.length
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Invalid participant ID received"
+                });
+            }
+
+            
+            const allParticipantIds = [
+                String(currentUserId),
+                ...participantIds.map((id) =>
+                    String(id)
+                )
+            ];
+
+
+            const uniqueParticipantIds = [
+                ...new Set(allParticipantIds)
+            ];
+
+            console.log(
+                "ALL PARTICIPANTS:",
+                uniqueParticipantIds
+            );
+
+
+            if (
+                type === "direct" &&
+                uniqueParticipantIds.length !== 2
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Direct chat must have exactly two users"
+                });
+            }
+
+          
+            if (
+                type === "group" &&
+                uniqueParticipantIds.length < 3
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Group chat must have at least three users"
+                });
+            }
+            if (
+                type === "group" &&
+                (!name || !name.trim())
+            ) {
+                return res.status(400).json({
+                    message:
+                        "Group name is required"
+                });
+            }
+
+            
+
+            if (type === "direct") {
+
+                const existingConversation =
+                    await Conversation.findOne({
+                        type: "direct",
+                        participants: {
+                            $all: uniqueParticipantIds,
+                            $size: 2
+                        }
+                    }).populate(
+                        "participants",
+                        "_id name email role"
+                    );
+
+                if (existingConversation) {
+                    console.log(
+                        "Existing direct conversation found"
+                    );
+
+                    return res.json(
+                        existingConversation
+                    );
+                }
+            }
+
+           
+
+            const conversation =
+                new Conversation({
+                    type: type,
+
+                    name:
+                        type === "group"
+                            ? name.trim()
+                            : undefined,
+
+                    participants:
+                        uniqueParticipantIds,
+
+                    createdBy:
+                        currentUserId
+                });
+
+            await conversation.save();
+
+            // Populate participants
+            const populatedConversation =
+                await Conversation.findById(
+                    conversation._id
+                ).populate(
+                    "participants",
+                    "_id name email role"
+                );
+
+            console.log(
+                "Conversation created:",
+                populatedConversation._id
+            );
+
+            res.status(201).json(
+                populatedConversation
+            );
+
+        } catch (error) {
+
+            console.error(
+                "========== CREATE CONVERSATION ERROR =========="
+            );
+
+            console.error(error);
+
+            res.status(500).json({
+                message:
+                    "Failed to create conversation",
+                error: error.message
+            });
+        }
+    }
+);
+
+
+
+router.get(
+    "/conversations/:conversationId/messages",
+    authenticate,
+    async (req, res) => {
+
+        try {
+
+            const currentUserId =
+                getUserId(req);
+
+            if (!currentUserId) {
+                return res.status(401).json({
+                    message:
+                        "User ID not found in token"
+                });
+            }
+
+            const conversation =
+                await Conversation.findById(
+                    req.params.conversationId
+                );
+
+            if (!conversation) {
+                return res.status(404).json({
+                    message:
+                        "Conversation not found"
+                });
+            }
+
+            const currentUserIdString =
+                String(currentUserId);
+
+            const isParticipant =
+                conversation.participants.some(
+                    (participant) =>
+                        String(participant) ===
+                        currentUserIdString
+                );
+
+            if (!isParticipant) {
+                return res.status(403).json({
+                    message:
+                        "You are not a participant in this conversation"
+                });
+            }
+
+            const messages =
+                await Message.find({
+                    conversation:
+                        req.params.conversationId
+                })
+                    .populate(
+                        "sender",
+                        "_id name email role"
+                    )
+                    .sort({
+                        createdAt: 1
+                    });
+
+            res.json(messages);
+
+        } catch (error) {
+
+            console.error(
+                "Get messages error:",
+                error
+            );
+
+            res.status(500).json({
+                message:
+                    "Failed to get messages"
+            });
+        }
+    }
+);
+
+module.exports = router;
