@@ -1,4 +1,14 @@
 node_modules/
 .env
+.env.*
+!.env.example
+
 uploads/
 chroma_data/
+
+client/node_modules/
+client/dist/
+
+server/node_modules/
+server/uploads/
+server/chroma_data/

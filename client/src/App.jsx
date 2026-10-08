@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "./pages/Login";
@@ -7,18 +8,40 @@ import Users from "./pages/Users";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
 import Tasks from "./pages/Tasks";
+import Chat from "./pages/Chat";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import AIChatbot from "./components/AIChatbot";
 
 function App() {
+  const [token, setToken] = useState(
+    localStorage.getItem("token")
+  );
+
+  useEffect(() => {
+    const checkToken = () => {
+      setToken(localStorage.getItem("token"));
+    };
+
+    window.addEventListener("storage", checkToken);
+
+    const interval = setInterval(checkToken, 500);
+
+    return () => {
+      window.removeEventListener("storage", checkToken);
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
+
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
-        {/* Protected Admin Routes */}
+        {/* Protected Routes */}
         <Route
           path="/dashboard"
           element={
@@ -64,12 +87,26 @@ function App() {
           }
         />
 
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Default Route */}
         <Route
           path="/"
           element={<Navigate to="/login" replace />}
         />
+
       </Routes>
+
+      {/* Show AI chatbot only when logged in */}
+      {token && <AIChatbot />}
+
     </BrowserRouter>
   );
 }
