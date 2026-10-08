@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import socket from "../socket";
 
-const API_URL = "http://localhost:5000";
+const API_URL = "";
 
 function Chat() {
     const [conversations, setConversations] = useState([]);
