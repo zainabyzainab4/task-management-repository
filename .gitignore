@@ -1,4 +1,4 @@
 node_modules/
 .env
 uploads/
-src/chroma_data/
+chroma_data/

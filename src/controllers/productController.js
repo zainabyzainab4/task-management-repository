@@ -140,6 +140,7 @@ const softDeleteProduct = async (req, res) => {
         });
     }
 };
+
 const patchProduct = async (req, res) => {
     try {
         const product = await Product.findOneAndUpdate(
@@ -171,6 +172,7 @@ const patchProduct = async (req, res) => {
         });
     }
 };
+
 const hardDeleteProduct = async (req, res) => {
     try {
         const product = await Product.findByIdAndDelete(req.params.id);
@@ -211,13 +213,15 @@ const uploadProductImage = async (req, res) => {
             });
         }
 
-        product.images.push(`/uploads/products/${req.file.filename}`);
+        const imageUrl = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${req.file.key}`;
+
+        product.images.push(imageUrl);
 
         await product.save();
 
         res.status(200).json({
             message: "Product image uploaded successfully",
-            image: `/uploads/products/${req.file.filename}`,
+            image: imageUrl,
             product
         });
     } catch (error) {
@@ -246,9 +250,11 @@ const uploadProductImages = async (req, res) => {
                 message: "Product not found"
             });
         }
-
+        
+	console.log("S3 FILES:", req.files);
         const imagePaths = req.files.map(
-            file => `/uploads/products/${file.filename}`
+            file =>
+                `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${file.key}`
         );
 
         product.images.push(...imagePaths);
@@ -271,12 +277,13 @@ const uploadProductImages = async (req, res) => {
 
 module.exports = {
     createProduct,
-getProducts,
-getProductById,
-updateProduct,
-softDeleteProduct,
-patchProduct,
- hardDeleteProduct,
-uploadProductImage,
-uploadProductImages
+    getProducts,
+    getProductById,
+    updateProduct,
+    softDeleteProduct,
+    patchProduct,
+    hardDeleteProduct,
+    uploadProductImage,
+    uploadProductImages
 };
+        

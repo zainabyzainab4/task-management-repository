@@ -9,7 +9,12 @@ const COLLECTION_NAME = "products";
 
 const getProductCollection = async () => {
     const collection = await client.getOrCreateCollection({
-        name: COLLECTION_NAME
+        name: COLLECTION_NAME,
+        configuration: {
+            hnsw: {
+                space: "cosine"
+            }
+        }
     });
 
     return collection;
@@ -20,13 +25,10 @@ const addProduct = async (product, embedding) => {
 
     await collection.upsert({
         ids: [product._id.toString()],
-
         embeddings: [embedding],
-
         documents: [
             `${product.name}. ${product.description}. Category: ${product.category}. Price: ${product.price}. Stock: ${product.stock}.`
         ],
-
         metadatas: [
             {
                 productId: product._id.toString(),
@@ -45,7 +47,11 @@ const searchProducts = async (embedding, limit = 5) => {
     const results = await collection.query({
         queryEmbeddings: [embedding],
         nResults: limit,
-        include: ["documents", "metadatas", "distances"]
+        include: [
+            "documents",
+            "metadatas",
+            "distances"
+        ]
     });
 
     return results;

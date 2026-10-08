@@ -1,56 +1,63 @@
 const { generateEmbedding } = require("./embeddingService");
+const { searchProducts } = require("./chromaService");
+const Product = require("../models/Product");
 
-const cosineSimilarity = (a, b) => {
-    let dotProduct = 0;
-    let magnitudeA = 0;
-    let magnitudeB = 0;
+const findSimilarProducts = async (question) => {
+    try {
+        // Create an embedding for the user's question
+        const questionEmbedding = await generateEmbedding(question);
 
-    for (let i = 0; i < a.length; i++) {
-        dotProduct += a[i] * b[i];
-        magnitudeA += a[i] * a[i];
-        magnitudeB += b[i] * b[i];
-    }
-
-    if (magnitudeA === 0 || magnitudeB === 0) {
-        return 0;
-    }
-
-    return dotProduct / (
-        Math.sqrt(magnitudeA) *
-        Math.sqrt(magnitudeB)
-    );
-};
-
-const findSimilarProducts = async (question, products) => {
-    const questionEmbedding = await generateEmbedding(question);
-
-    const results = [];
-
-    for (const product of products) {
-        const productText = `
-            Product name: ${product.name}
-            Description: ${product.description}
-            Category: ${product.category}
-            Price: ${product.price}
-            Stock: ${product.stock}
-        `;
-
-        const productEmbedding = await generateEmbedding(productText);
-
-        const similarity = cosineSimilarity(
+        // Search ChromaDB for the most similar products
+        const results = await searchProducts(
             questionEmbedding,
-            productEmbedding
+            5
         );
 
-        results.push({
-            product,
-            similarity
-        });
-    }
+        const productIds = results.metadatas?.[0]
+            ?.map((metadata) => metadata.productId)
+            .filter(Boolean) || [];
 
-    return results
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 5);
+        if (productIds.length === 0) {
+            return [];
+        }
+
+        // Fetch the actual products from MongoDB
+        const products = await Product.find({
+            _id: { $in: productIds },
+            isDeleted: false
+        }).lean();
+
+        // Keep the same order as ChromaDB similarity results
+        const productMap = new Map(
+            products.map((product) => [
+                product._id.toString(),
+                product
+            ])
+        );
+
+        return productIds
+            .map((productId, index) => {
+                const product = productMap.get(productId);
+
+                if (!product) {
+                    return null;
+                }
+
+                return {
+                    product,
+                    similarity: results.distances?.[0]?.[index] ?? null
+                };
+            })
+            .filter(Boolean);
+
+    } catch (error) {
+        console.error(
+            "Vector search error:",
+            error.message
+        );
+
+        return [];
+    }
 };
 
 module.exports = {
