@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -9,6 +10,7 @@ import Products from "./pages/Products";
 import Orders from "./pages/Orders";
 import Tasks from "./pages/Tasks";
 import Chat from "./pages/Chat";
+import Videos from "./pages/Videos";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import AIChatbot from "./components/AIChatbot";
@@ -36,7 +38,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -96,17 +97,24 @@ function App() {
           }
         />
 
+        <Route
+          path="/videos"
+          element={
+            <ProtectedRoute>
+              <Videos />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Default Route */}
         <Route
           path="/"
           element={<Navigate to="/login" replace />}
         />
-
       </Routes>
 
       {/* Show AI chatbot only when logged in */}
       {token && <AIChatbot />}
-
     </BrowserRouter>
   );
 }
